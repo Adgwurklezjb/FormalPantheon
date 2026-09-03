@@ -1,0 +1,5 @@
+import BoundedGaps.H1236.TupleBridge
+
+#print axioms BoundedGaps.H1236.boundedGapsStatement236_contract
+#print axioms BoundedGaps.H1236.boundedGapsStatement236_of_engelsmaTuple48_two_prime_shifts
+#print axioms BoundedGaps.H1236.primeGapLiminfStatement236_iff_boundedGapsStatement236
