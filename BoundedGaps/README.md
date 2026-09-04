@@ -1,5 +1,27 @@
 # BoundedGapsMathlib
 
+## Project status
+
+The definitive classification and reproducibility status is in
+[`Documentation/H1236/PROJECT_STATUS.md`](Documentation/H1236/PROJECT_STATUS.md).
+In brief:
+
+- `H₁ ≤ 600` is the complete native FormalPantheon result and depends only on
+  `propext`, `Classical.choice`, and `Quot.sound`.
+- The older Stadlmann-based `H₁ ≤ 236` route has complete statement, tuple,
+  and bridge layers but incomplete analysis. Its printed universal Type-II
+  clause was refuted at the stated generality, and `AnalyticInput.lean` was
+  deliberately not created.
+- The preferred better-bound route is the permanent conditional
+  [`PrimeGaps186` bridge](Verification/PrimeGaps186Bridge/). It verifies the
+  stronger upstream `H₁ ≤ 186` theorem and derives the public `H₁ ≤ 236`
+  statement, conditional on exactly
+  `PrimeGap186.kloosterman3_bound`,
+  `PrimeGap186.kloosterman2_correlation_bound`, and
+  `PrimeGap186.physical_integral_bounds`.
+
+Neither the upstream 186 theorem nor its derived 236 result is unconditional.
+
 BoundedGapsMathlib is a Lean 4 and Mathlib formalization of James Maynard's
 unconditional bounded-gaps theorem. It proves, without project-specific
 axioms, that prime pairs separated by at most 600 occur arbitrarily far along
@@ -63,6 +85,25 @@ the elaborated interfaces, verifies production delegation and isolation from
 the challenge placeholders, and checks the permitted axiom footprint. The
 broader publication trust replay also passed the BV interface, exact
 certificate, final-composition, proof-closure, and axiom gates.
+
+## Conditional H₁ ≤ 236 verification
+
+A separate pinned subproject at
+[`Verification/PrimeGaps186Bridge/`](Verification/PrimeGaps186Bridge/) verifies
+that the conditional theorem `PrimeGap186.primeGapLiminf_le_186` implies the
+current public `BoundedGaps.H1236.boundedGapsStatement236`. Run it from a fresh
+checkout with:
+
+```sh
+Verification/PrimeGaps186Bridge/verify.sh
+```
+
+This cross-toolchain route is conditional on exactly
+`PrimeGap186.kloosterman3_bound`,
+`PrimeGap186.kloosterman2_correlation_bound`, and
+`PrimeGap186.physical_integral_bounds`. It is independent of both the
+unconditional H₁ ≤ 600 proof and the incomplete, superseded Stadlmann
+Proposition 3 route. The main project remains pinned to Lean 4.32.0.
 
 ## References And Project Map
 

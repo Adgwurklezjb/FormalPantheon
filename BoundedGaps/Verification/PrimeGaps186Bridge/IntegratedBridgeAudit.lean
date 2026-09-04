@@ -1,0 +1,7 @@
+import IntegratedBridge
+
+#print axioms BoundedGaps.H1236.primeGaps186_gapTerm_eq
+#print axioms BoundedGaps.H1236.primeGaps186_liminf_eq_formalPantheon
+#print axioms BoundedGaps.H1236.primeGapLiminfStatement186_of_primeGaps186
+#print axioms BoundedGaps.H1236.primeGapLiminfStatement236_of_primeGaps186
+#print axioms BoundedGaps.H1236.boundedGapsStatement236_of_primeGaps186

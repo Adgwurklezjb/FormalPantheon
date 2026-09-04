@@ -1,0 +1,27 @@
+name = "primeGaps186BridgeVerification"
+version = "0.1.0"
+defaultTargets = ["IntegratedBridge"]
+fixedToolchain = true
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "bbcd1968ee6950abe88b85dba6995da346c4b2a8"
+
+[[require]]
+name = "primeGaps186"
+git = "https://github.com/openai/PrimeGaps186.git"
+rev = "61340d0b74163003b32756bb16e91d9209a5e330"
+
+# Compile the actual public FormalPantheon statement modules from the parent
+# checkout under this subproject's toolchain. Building IntegratedBridge only
+# builds their small transitive import closure, not the full Lean 4.32 project.
+[[lean_lib]]
+name = "BoundedGaps"
+srcDir = "../.."
+
+[[lean_lib]]
+name = "IntegratedBridge"
+roots = ["IntegratedBridge"]
+globs = ["IntegratedBridge"]

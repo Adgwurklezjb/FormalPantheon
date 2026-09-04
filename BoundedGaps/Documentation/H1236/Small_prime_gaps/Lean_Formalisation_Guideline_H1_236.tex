@@ -1,0 +1,1242 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=27mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs,longtable,array,tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\definecolor{leanblue}{RGB}{20,65,115}
+\definecolor{codegray}{RGB}{246,247,249}
+\definecolor{warningred}{RGB}{145,25,35}
+\definecolor{gateblue}{RGB}{230,240,250}
+
+\hypersetup{
+  pdftitle={Guideline for an End-to-End Lean 4 Formalisation of H1 <= 236},
+  pdfauthor={Project specification},
+  pdfsubject={Lean 4, mathlib, bounded gaps between primes, formal verification}
+}
+
+\lstdefinelanguage{Lean}{
+  morekeywords={theorem,lemma,def,structure,class,instance,namespace,end,where,
+    by,have,show,exact,apply,intro,constructor,refine,obtain,let,if,then,else,
+    match,with,fun,forall,exists,import,open,scoped,noncomputable,set_option,
+    example,abbrev,inductive,deriving},
+  sensitive=true,
+  morecomment=[l]{--},
+  morecomment=[s]{/-}{-/},
+  morestring=[b]"
+}
+
+\lstset{
+  language=Lean,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{leanblue}\bfseries,
+  commentstyle=\color{gray!75!black},
+  stringstyle=\color{green!35!black},
+  backgroundcolor=\color{codegray},
+  frame=single,
+  rulecolor=\color{gray!35},
+  columns=fullflexible,
+  keepspaces=true,
+  breaklines=true,
+  showstringspaces=false,
+  xleftmargin=0.6em,
+  xrightmargin=0.6em,
+  aboveskip=0.8em,
+  belowskip=0.8em
+}
+
+\newtheorem{principle}{Principle}
+\newtheorem{gate}{Acceptance gate}
+\newtheorem{warning}{Warning}
+\newcommand{\Hone}{H_1}
+\newcommand{\leanname}[1]{\texttt{#1}}
+\newcommand{\pass}{\textsc{pass}}
+\newcommand{\fail}{\textsc{fail}}
+\newcommand{\todo}{\textsc{open}}
+\newcommand{\mustpass}{\textsc{must pass}}
+
+\title{Project Guideline for an End-to-End Lean 4 Formalisation\\
+of the Target Bound \(\Hone\leq 236\)}
+\author{Formalisation and release specification}
+\date{Version 1.0 --- 3 September 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document specifies how to turn the present manuscript-conditional,
+computer-assisted argument for \(\Hone\leq236\) into a genuinely
+unconditional Lean 4 theorem, developed with ChatGPT/Codex in Visual Studio
+Code and released with its paper on arXiv.  It fixes the formal statement,
+trust boundary, repository layout, dependency graph, certificate architecture,
+development protocol, audit gates, and release package.  It is a guideline and
+project contract, not a claim that the bound has already been formalised.
+
+The decisive requirement is that the final theorem must not assume the
+Stadlmann sieve input, the negative-\(\omega_0\) repair, any numerical
+certificate, or any analytic estimate as a project-specific axiom.  Each must
+be proved in Lean from definitions and already kernel-checked library results.
+The final declaration must build in a clean checkout, and its axiom audit may
+contain only Lean's standard foundational axioms.  This makes the project much
+larger than translating the finite certificate: the Bombieri--Vinogradov,
+Maynard-sieve, Harman-minorant, and Type-I/II/III layers are the main work.
+\end{abstract}
+
+\tableofcontents
+
+\section{Outcome and non-negotiable meaning of ``unconditional''}
+
+The target deliverable is a Lean project whose public theorem has no hypotheses
+other than definitions already appearing in its statement.  At mathematical
+level it should imply
+\[
+  \Hone=\liminf_{n\to\infty}(p_{n+1}-p_n)\leq236.
+\]
+At formal level the primary theorem should use an elementary, unambiguous
+``infinitely often'' formulation; a separate bridge may identify it with the
+usual liminf notation.
+
+\begin{principle}[Formalisation changes the status only at the last gate]
+Until the analytic input has itself been constructed by proved Lean terms, the
+correct public description remains ``conditional formalisation'' or
+``formalisation in progress.''  A Lean theorem of the form
+\leanname{conditional\_H1\_le\_236 (h : AnalyticInput) : ...} is useful, but it
+does not make the result unconditional.
+\end{principle}
+
+For this project, ``unconditional'' means all of the following.
+
+\begin{enumerate}[label=U\arabic*.,leftmargin=3.2em]
+\item No unproved conjecture or manuscript proposition occurs as a hypothesis
+  of the final theorem.
+\item No project declaration made with \leanname{axiom}, no
+  \leanname{sorry}/\leanname{admit}, and no externally asserted numerical fact
+  occurs in the transitive dependency closure of the final theorem.
+\item External solvers and interval packages may \emph{generate} data, but a
+  proved Lean checker must verify every datum needed by the theorem.
+\item All analytic results cited on paper, including ``standard'' endpoint and
+  uniformity arguments, are either imported as already proved Lean theorems or
+  proved in this project.
+\item A clean build, axiom audit, and independent replay succeed with a pinned
+  Lean and mathlib snapshot.
+\end{enumerate}
+
+It is legitimate to trust Lean's kernel and the pinned, kernel-checked mathlib
+release.  It is also normal for \leanname{\#print axioms} to report the built-in
+axioms \leanname{propext}, \leanname{Classical.choice}, and
+\leanname{Quot.sound}.  Any \leanname{sorryAx}, compiler-trust computation
+axiom, or project-specific axiom is a release blocker.  Lean's official proof
+validation guide explains this distinction and recommends both axiom printing
+and independent rechecking \cite{LeanValidation}.
+
+\begin{warning}[Scale]
+The current mathematical dossier isolates a short finite crossing, but it
+imports a very deep analytic framework.  The end-to-end formalisation should be
+budgeted as a multi-person-year research and engineering project unless the
+initial dependency audit finds substantially more reusable formalised analytic
+number theory than is presently documented.  The existing mathlib Selberg
+sieve is valuable infrastructure, not a ready-made Maynard--Stadlmann theorem
+\cite{MathlibSelberg}.
+\end{warning}
+
+\section{Freeze the mathematical target before coding}
+
+\subsection{The robust primary statement}
+
+Define consecutive primes without relying on a particular enumeration:
+
+\begin{lstlisting}
+import Mathlib
+
+namespace PrimeGaps236
+
+def ConsecutivePrimes (p q : Nat) : Prop :=
+  Nat.Prime p /\ Nat.Prime q /\ p < q /\
+    forall r : Nat, p < r -> r < q -> Not (Nat.Prime r)
+
+def BoundedPrimeGaps (H : Nat) : Prop :=
+  forall N : Nat, exists p q : Nat,
+    N <= p /\ ConsecutivePrimes p q /\ q - p <= H
+
+theorem boundedPrimeGaps_236 : BoundedPrimeGaps 236 := by
+  -- Final proof term; no assumptions and no placeholders.
+  ...
+
+end PrimeGaps236
+\end{lstlisting}
+
+The ASCII logical notation above is deliberately portable in this guideline;
+the source project may use Lean's Unicode notation.  This statement is the
+preferred release theorem because a human auditor can read its meaning without
+unfolding filter liminf machinery.
+
+In a second file define the indexed prime gap using mathlib's
+\leanname{Nat.nth Nat.Prime} and prove equivalence with the usual infinitely
+often statement.  Only after that bridge is established should the paper use a
+Lean theorem named, for example,
+\leanname{H1\_le\_236}.  Mathlib already supplies the prime predicate, nth
+prime, prime-counting definitions, and elementary connections among them
+\cite{MathlibPrimeCounting}.
+
+\subsection{Formal source of the number 236}
+
+The last step must be factored into two independent statements:
+\begin{enumerate}
+\item a general theorem saying that an admissible \(48\)-tuple satisfying the
+  verified sieve criterion has infinitely many translates containing two
+  primes; and
+\item a finite theorem that the explicit tuple
+\[
+\begin{split}
+\mathcal H=\{&0,6,8,14,18,24,26,48,50,54,56,60,66,68,74,78,80,84,\\
+&90,96,98,104,110,116,120,126,134,138,144,150,158,164,168,176,\\
+&180,186,188,194,200,204,206,210,216,224,228,230,234,236\}
+\end{split}
+\]
+is admissible, has cardinality \(48\), minimum \(0\), and maximum \(236\).
+\end{enumerate}
+The second theorem should be completely computational and kernel-checkable.
+For primes at most \(48\), verify an omitted residue; for larger primes,
+cardinality alone prevents coverage of every residue class.
+
+\subsection{Corrected analytic proposition}
+
+The informal source must first be rewritten as one fully quantified theorem.
+The corrected theorem must make the following branch explicit:
+\[
+ \omega_0<0 \quad\Longrightarrow\quad
+ \text{use a Bombieri--Vinogradov estimate strictly below level }1/2,
+\]
+whereas the four-bin Type-IIc condition is used only for
+\(0\leq\omega_0\leq\omega\).  The endpoint \(\omega_0=0\) must be assigned to
+exactly one branch.  It is not enough to cite the prose repair in the current
+dossier: the modulus, dyadic interval, logarithmic loss, and uniform constants
+must all appear in the statement proved by Lean.
+
+\begin{gate}[Statement review]
+Two analytic number theorists and one Lean reviewer should approve the
+unfolded meaning of \leanname{BoundedPrimeGaps 236}, the exact corrected sieve
+statement, and the quantifier order of every asymptotic parameter before the
+main formalisation begins.  Record the approved statements in a tagged commit.
+\end{gate}
+
+\section{Toolchain and VS Code setup}
+
+Lean's installation guide recommends \leanname{elan} as the toolchain manager,
+VS Code with the official \leanname{leanprover.lean4} extension, and
+\leanname{lake} for projects \cite{LeanInstall}.  A current mathlib project can
+be created with:
+
+\begin{lstlisting}[language=bash]
+code --install-extension leanprover.lean4
+lake +leanprover-community/mathlib4:lean-toolchain \
+  new PrimeGaps236 math
+cd PrimeGaps236
+lake exe cache get
+lake build
+code .
+\end{lstlisting}
+
+Immediately after creation:
+
+\begin{enumerate}
+\item Commit \leanname{lean-toolchain}, \leanname{lakefile.toml} (or
+  \leanname{lakefile.lean}), and \path{lake-manifest.json}.
+\item Record the exact Lean version, mathlib commit hash, operating system, and
+  architecture in \leanname{REPRODUCING.md}.
+\item Set \leanname{set\_option autoImplicit false} in project modules, so a
+  misspelled identifier does not silently create an unintended variable.
+\item Turn warnings into CI failures for project code.  A use of
+  \leanname{sorry} must never be merged simply because the editor shows a
+  checked declaration around it.
+\item Do not track \leanname{.lake/} or generated \leanname{.olean} files.
+  They are caches, not the proof source.
+\end{enumerate}
+
+Do not update Lean or mathlib opportunistically.  Toolchain upgrades belong in
+dedicated branches and must rebuild every module.  The release tag fixes one
+manifest permanently; later upgrades produce a new release.
+
+\section{Repository architecture}
+
+Use a dependency-directed tree.  The following layout is a recommendation;
+names may change, but the separation of logical layers should not.
+
+\begin{lstlisting}[language={}]
+PrimeGaps236/
+  lean-toolchain
+  lakefile.toml
+  lake-manifest.json
+  README.md
+  REPRODUCING.md
+  LICENSE
+  PrimeGaps236.lean
+  PrimeGaps236/
+    Definitions/PrimeGaps.lean
+    Foundations/FiniteSums.lean
+    Foundations/Asymptotics.lean
+    Foundations/ArithmeticFunctions.lean
+    Foundations/ResidueClasses.lean
+    Sieve/AbstractInput.lean
+    Sieve/SelbergWeights.lean
+    Sieve/MainTerm.lean
+    Sieve/MaynardCriterion.lean
+    Distribution/BombieriVinogradov.lean
+    Distribution/TypeI.lean
+    Distribution/TypeII.lean
+    Distribution/TypeIII.lean
+    Distribution/NegativeOmega.lean
+    Minorant/Harman.lean
+    Minorant/Mass.lean
+    Support/Definitions.lean
+    Support/FrontierReduction.lean
+    Support/DirectCases.lean
+    Support/AdaptiveCases.lean
+    Certificates/RationalLP.lean
+    Certificates/IntervalPolynomial.lean
+    Certificates/SupportData.lean
+    Certificates/IntegralData.lean
+    TrialFunction/Chebyshev.lean
+    TrialFunction/Integrals.lean
+    TrialFunction/Crossing.lean
+    Tuple/Admissible236.lean
+    Final.lean
+    AxiomAudit.lean
+  generators/
+    README.md
+    export_support_certificates.py
+    export_integral_certificates.py
+  paper/
+    main.tex
+    main.bbl
+    source-map.tex
+  release/
+    manifest.sha256
+\end{lstlisting}
+
+Generator programs are intentionally outside the trusted proof path.  They may
+be complex and use arbitrary precision, linear-programming, or interval
+libraries.  Lean imports only certificate data and proves that the small
+checkers accept it.
+
+\subsection{Dependency order}
+
+\begin{longtable}{p{0.065\textwidth}p{0.22\textwidth}p{0.365\textwidth}p{0.22\textwidth}}
+\toprule
+Layer & Product & Principal obligations & May depend on \\
+\midrule
+\endfirsthead
+\toprule
+Layer & Product & Principal obligations & May depend on \\
+\midrule
+\endhead
+L0 & Definitions & Prime gaps, admissibility, support cells, weights, exact
+parameters & Lean and mathlib only \\
+L1 & Reusable foundations & Finite sums, arithmetic functions, congruences,
+filters, integrals, exact polynomials & L0 and mathlib \\
+L2 & Certificate checkers & Rational LP duality, rational interval and
+polynomial checks, tuple check & L0--L1 \\
+L3 & Finite witnesses & All 105 support pairs, trial function, \(I,J,K\),
+minorant-loss bound, strict crossing & L0--L2 \\
+L4 & Abstract sieve & Selberg/Maynard weights, \(S_1,S_2\), positivity, passage
+from two primes in a tuple to a bounded consecutive gap & L0--L1 \\
+L5 & Distribution & Bombieri--Vinogradov and the exact Type-I/II/III estimates,
+including endpoints and uniformity & L0--L1 \\
+L6 & Minorant & Harman minorant, roughness, mass, distribution on the verified
+support & L1, L3, L5 \\
+L7 & Assembly & Instantiate the abstract sieve and apply the tuple theorem &
+L2--L6 \\
+L8 & Audit & Axiom report, independent checker, paper/source map & all layers \\
+\bottomrule
+\end{longtable}
+
+Keep imports one-way.  In particular, foundational analytic modules must not
+import the final numerical data.  This prevents an accidental circular proof
+or a theorem whose generality is only cosmetic.
+
+\section{A staged proof strategy that exposes risk early}
+
+Two strands should start immediately.  First, build a vertical formal skeleton
+ending in a conditional theorem with an explicit \leanname{AnalyticInput}
+argument.  Second, attack one representative hard analytic estimate early,
+preferably the most demanding Type-III leaf identified by the source audit.
+The first strand validates the finite architecture; the second prevents the
+project from spending a year polishing certificates before discovering a
+missing theory stack.
+
+\subsection{Milestones and exit criteria}
+
+\begin{longtable}{p{0.065\textwidth}p{0.20\textwidth}p{0.48\textwidth}p{0.125\textwidth}}
+\toprule
+ID & Milestone & Mandatory exit criterion & Status at start \\
+\midrule
+\endfirsthead
+\toprule
+ID & Milestone & Mandatory exit criterion & Status at start \\
+\midrule
+\endhead
+M0 & Specification & Approved target statements, source ledger, pinned
+toolchain, CI, and empty axiom audit & \todo \\
+M1 & Conditional spine & A theorem
+\leanname{conditional\_H1\_le\_236} whose only nonfinite hypothesis is one
+precisely defined \leanname{AnalyticInput} structure & \todo \\
+M2 & Finite support & Kernel-checked proofs of frontier reduction and all 105
+partition pairs; no Python or LP solver in the trust boundary & \todo \\
+M3 & Trial function & Exact formal witness and a proved strict inequality with
+a rational margin; all integral enclosures checked in Lean & \todo \\
+M4 & Abstract sieve & Maynard/Stadlmann implication proved from an explicit
+distribution interface, with all limit and positivity steps & \todo \\
+M5 & Classical distribution & Sufficient Bombieri--Vinogradov theorem proved,
+including the precise weighted and dyadic form used later & \todo \\
+M6 & Extended distribution & Type-I/II/III propositions proved with every
+cited auxiliary estimate instantiated & \todo \\
+M7 & Minorant & Constructed \(\rho\), bounds \(-24\leq\rho\leq1_{\mathbb P}\),
+roughness, mass \(1-c_1\), and distribution & \todo \\
+M8 & Unconditional theorem & \leanname{boundedPrimeGaps\_236} has no arguments,
+builds cleanly, and passes the complete axiom audit & \todo \\
+M9 & Release & Paper/source correspondence audit, independent rebuild,
+archival code package, and arXiv preview approval & \todo \\
+\bottomrule
+\end{longtable}
+
+M1 is deliberately conditional.  Define a structure instead of inserting
+temporary axioms:
+
+\begin{lstlisting}
+structure AnalyticInput where
+  rho : Nat -> Real
+  lower_bound : ...
+  upper_bound : ...
+  rough_support : ...
+  mass_asymptotic : ...
+  equidistribution : ...
+
+theorem conditional_H1_le_236
+    (h : AnalyticInput) : BoundedPrimeGaps 236 := by
+  ...
+
+theorem constructAnalyticInput : AnalyticInput := by
+  -- M5--M7.  This is the analytic mountain.
+  ...
+
+theorem boundedPrimeGaps_236 : BoundedPrimeGaps 236 :=
+  conditional_H1_le_236 constructAnalyticInput
+\end{lstlisting}
+
+The ellipses shown in this guideline are specifications, not code permitted in
+the repository.
+
+\section{The analytic formalisation program}
+
+\subsection{Source ledger before proof translation}
+
+Every invocation of ``standard,'' ``similarly,'' or ``by a routine dyadic
+decomposition'' in the sources must become an entry in
+\leanname{SOURCE\_LEDGER.md}.  Each row should contain:
+\[
+\begin{gathered}
+\text{paper locator},\quad \text{exact informal statement},\quad
+\text{Lean theorem name},\\
+\text{dependencies},\quad \text{endpoint conventions},\quad
+\text{status}.
+\end{gathered}
+\]
+If a citation gives a theorem in a different normalization, add a separate
+conversion lemma.  Never hide normalization changes inside a long tactic
+proof.
+
+The attached Maynard paper is the published source for the basic small-gap
+sieve \cite{Maynard2015}.  The existing \(236\) dossier then uses the
+Stadlmann framework and a corrected negative-\(\omega_0\) branch
+\cite{Stadlmann2026}.  Since the latter source is a manuscript, formalisation
+must proceed from a corrected, self-contained mathematical statement rather
+than from proposition numbers alone.
+
+\subsection{Mathlib inventory}
+
+At the pinned commit, use \leanname{\#check}, documentation search, and source
+search to inventory at least:
+
+\begin{itemize}
+\item \leanname{Nat.Prime}, nth primes, prime counting, divisors, squarefree
+integers, Möbius and von Mangoldt functions;
+\item Dirichlet characters, finite Fourier sums, roots of unity, and character
+orthogonality;
+\item real and complex finite sums, Cauchy--Schwarz, Hölder, summation by parts,
+and interval integrals;
+\item filters and asymptotic notation at infinity;
+\item existing Selberg-sieve structures and diagonalisation; and
+\item any large-sieve, exponential-sum, Kloosterman-sum, or prime-distribution
+theorems that can be reused without changing the desired statement.
+\end{itemize}
+
+Current documentation exhibits prime-counting, Dirichlet-character, Möbius,
+asymptotic, and Selberg-sieve infrastructure
+\cite{MathlibPrimeCounting,MathlibDirichlet,MathlibMoebius,MathlibAsymptotics,MathlibSelberg}.
+It should not be assumed, without a pinned-source search, that a theorem named
+Bombieri--Vinogradov or the needed Type-I/II/III estimates is available.
+
+\subsection{Maynard sieve layer}
+
+Formalise the narrowest theorem sufficient for \(k=48\), while keeping the
+main combinatorial argument parameterized where this reduces duplication.  A
+complete checklist is:
+
+\begin{enumerate}[label=A\arabic*.,leftmargin=3.2em]
+\item Define admissible tuples, the \(W\)-trick, residue selection, and the
+  multidimensional divisor weights.
+\item Define the sums \(S_1\) and \(S_2\), prove nonnegativity, and state the
+  exact positivity implication that forces at least two prime values.
+\item Expand squares and justify every interchange of finite sums.
+\item Evaluate the main terms and isolate remainder terms with explicit
+  uniform quantifiers.
+\item Connect the distribution estimate for the minorant to the remainder
+  bound needed by \(S_2\).
+\item Prove that two primes in one translate of a diameter-\(236\) tuple contain
+  a pair of consecutive primes at distance at most \(236\).  The two detected
+  primes need not themselves be consecutive; choose adjacent primes inside
+  their interval.
+\item Convert arbitrarily large successful translates into
+  \leanname{BoundedPrimeGaps 236}.
+\end{enumerate}
+
+The existing mathlib Selberg-sieve diagonalisation may shorten A2--A4, but its
+upper-bound-sieve interface must be compared carefully with the lower-bound,
+multidimensional weights used here.
+
+\subsection{Bombieri--Vinogradov layer}
+
+Prove only the version actually needed by the negative-\(\omega_0\) branch,
+but do not weaken its statement by suppressing dependencies.  The theorem must
+name:
+
+\begin{itemize}
+\item the interval or dyadic range for the integer variable;
+\item the modulus range and the fixed positive distance below exponent
+  \(1/2\);
+\item whether weights are \(\Lambda\), \(\theta\), or prime indicators;
+\item the coprimality and exceptional-residue conditions;
+\item the norm in which errors are averaged over moduli;
+\item the quantifier order for \(A\), the level loss, and the threshold
+  \(x_0(A)\); and
+\item the conversion from the proved form to the exact moving/dyadic form used
+  in the sieve.
+\end{itemize}
+
+A conventional route is large sieve plus a combinatorial identity such as
+Vaughan's identity.  Whether that is the shortest formal route must be decided
+after the inventory.  Any quoted large-sieve inequality, zero-free result, or
+character estimate not already proved in mathlib becomes a named subproject.
+
+\subsection{Type-I/II/III layer}
+
+This is likely the largest risk.  For each estimate:
+
+\begin{enumerate}[label=D\arabic*.,leftmargin=3.2em]
+\item State a finite-
+\(x\) version with explicit constants or an eventual bound whose quantifiers
+are completely formal.
+\item Split the convolution variables exactly as in the corrected source.
+\item Formalise the support-partition proposition separately from the analytic
+estimate.  The certificate proves only that the exponents lie in an allowed
+region; it does not prove the estimate on that region.
+\item Trace every external exponential-sum input to a formal theorem.  If a
+deep algebraic-geometric estimate is used only through a black-box paper
+citation, it cannot be introduced as an axiom and still support the word
+``unconditional.''
+\item Prove uniformity under the finite collection of dyadic decompositions and
+all smooth cutoffs.  Record powers of \(\log x\) instead of absorbing them
+informally.
+\item Close overlaps and endpoints explicitly, especially \(\omega_0=0\).
+\end{enumerate}
+
+Run an early feasibility spike on the hardest D4 input.  If its formal
+dependency tree reaches an unavailable theory that would itself take years,
+the project can either formalise that theory, seek a different analytic route,
+or revise the target bound.  It must not silently declare the input.
+
+\subsection{Harman minorant and mass}
+
+Construct the minorant \(\rho(n;x)\) rather than postulating it.  The Lean
+interface must prove:
+\[
+ -24\leq\rho(n;x)\leq\mathbf 1_{\mathbb P}(n),\qquad
+ \rho(n;x)\ne0\Longrightarrow P^-(n)>x^{979/5000},
+\]
+the mass formula with loss \(c_1\), and precisely the distribution property
+used by the sieve.  The rectangle majorant
+\[
+ c_1\leq
+ \frac{1291475390625}{14389093733134384}
+\]
+is rational and should be proved directly from the exceptional-region
+definitions.  In particular, prove rather than comment that every denominator
+factor is at least \(979/5000\).
+
+\section{Formalising the finite support certificate}
+
+The current certificate uses two support slices, \(105\) frontier pairs,
+\(73\) direct Type-IIc cases, \(8\) adaptive cases, and \(24\) rational-LP
+cases.  These counts should appear as Lean theorems, not comments.
+
+\subsection{Exact parameters}
+
+Represent every terminating decimal as a rational literal or a numerator and
+denominator.  Define the parameter bundle once:
+\[
+ k=48,\quad \delta=\frac7{500},\quad
+ A_1=\frac{253}{1000},\quad A_2=\frac{129}{500},
+\]
+\[
+ \xi_1=\frac{759}{2000},\qquad
+ \xi_2=\xi_3=\frac{4021}{10000},\qquad
+ \eta_P=10^{-10}.
+\]
+Do not let real-number coercions obscure an exact inequality: first prove the
+rational comparison, then transport it to \(\mathbb R\).
+
+\subsection{Frontier reduction}
+
+Prove the merge lemma abstractly: if a block has more than six entries, merge
+two entries; the merged mass remains at most \(0.202<1\), and any packing of the
+merged list lifts to a packing of the original list by keeping the two
+constituents in the same bin.  Iteration reduces the problem to counts
+\(0,\ldots,6\), producing
+\[
+ \binom82+7^2+\binom82=105
+\]
+unordered lower/lower, lower/upper, and upper/upper pairs.
+
+Model bins and assignments with finite types.  Separate the mathematical
+predicate \leanname{Fits} from the decision procedure \leanname{checkFits}, and
+prove a soundness theorem
+\[
+ \leanname{checkFits cert input = true}\Longrightarrow
+ \leanname{Fits input}.
+\]
+
+\subsection{LP dual checker}
+
+An external LP solver may propose partitions and dual multipliers.  The Lean
+checker must verify over \(\mathbb Q\):
+
+\begin{enumerate}
+\item dimensions and index bounds;
+\item signs of all dual multipliers;
+\item exact stationarity \(A^{T}y=c\);
+\item exact dual objective comparison; and
+\item the conclusion by a proved weak-duality lemma.
+\end{enumerate}
+
+Certificate deserialization is not a logical step.  Prefer generated Lean data
+files whose arrays have statically checked lengths, or parse a simple format
+and prove that checker acceptance implies the theorem regardless of parser
+behavior.  Floating-point output is never admitted directly.
+
+\subsection{Axiom-free computation policy}
+
+For modest computations, prefer definitional reduction,
+\leanname{norm\_num}, or kernel-evaluated decision procedures.  Native
+evaluation can enlarge the trust base and is visible in the axiom report; the
+exact behavior is Lean-version dependent \cite{LeanValidation}.  The release
+policy is therefore:
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{0.29\textwidth}X p{0.18\textwidth}}
+\toprule
+Method & Policy & Release status \\
+\midrule
+Explicit proof term / \leanname{norm\_num} & Preferred where practical &
+\pass \\
+Kernel reduction / proved reflective checker & Preferred for certificates &
+\pass \\
+Native computation producing a reported computation axiom & Useful for
+exploration, replace before strict release & \fail \\
+External Arb/LP assertion imported as a theorem & Never acceptable & \fail \\
+Project \leanname{axiom}, \leanname{sorry}, or \leanname{admit} & Never
+acceptable & \fail \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+If kernel evaluation is too slow, improve the certificate format and checker;
+do not weaken the theorem's trust claim.
+
+\section{Formalising the trial function and strict crossing}
+
+\subsection{Exact Chebyshev witness}
+
+Define the three piecewise polynomial profiles from the archived rational
+Chebyshev coefficients.  Prove the Chebyshev recurrence and the equivalence of
+the Chebyshev and monomial evaluations used by the certificate.  Define the
+symmetric trial function from these profiles and prove measurability, bounded
+support, symmetry, and square integrability.
+
+The current proof gives an exact rational \(I\)-quadratic form and tight
+outward-rounded enclosures for the \(J\)-matrix.  In Lean, replace the Arb
+trust assumption by one of these proof-producing routes, in preferred order:
+
+\begin{enumerate}
+\item exact rational integration of polynomial pieces over rational cells;
+\item rational Bernstein bounds on a certified subdivision, with a proved
+  integration bound; or
+\item a small rational interval-arithmetic checker proved sound in Lean.
+\end{enumerate}
+
+The generator may use Arb to choose subdivisions, but the final lower and upper
+bounds must follow from rational certificates checked by Lean.  Keep the strict
+margin as a rational inequality after clearing positive denominators.
+
+\subsection{Prefer an explicit positive enlargement}
+
+The present dossier proves the crossing first at support-enlargement parameter
+\(\varepsilon=0\), then invokes dominated convergence and absolute continuity
+to obtain some \(\varepsilon>0\).  That is valid as an informal route but
+expensive to formalise and easy to mismatch with open/closed boundaries.
+
+The preferred formal route is to choose a concrete positive rational
+\(\varepsilon_*\), small enough to retain the margin, and certify directly:
+\[
+ \frac{48(1-c_1)J(F;\varepsilon_*)-
+       48\cdot24 K(F;\varepsilon_*)}{I(F;\varepsilon_*)}>1.
+\]
+Do not guess \(\varepsilon_*\).  Extend the existing exact geometry program to
+search for one, then import only the rational certificate into Lean.  This
+removes an entire measure-theoretic limit bridge from the critical path.  If no
+reasonable direct certificate is found, formalise the convergence proof with
+all boundary-null-set and domination lemmas.
+
+\begin{gate}[Finite crossing]
+The gate passes only when one theorem with no hypotheses proves the exact
+strict sieve inequality for a specific rational witness and, preferably, a
+specific positive rational \(\varepsilon_*\).  Decimal display values are
+documentation only.
+\end{gate}
+
+\section{Controlling asymptotics and quantifiers}
+
+Informal analytic-number-theory papers routinely reuse \(o(1)\), allow implied
+constants to change, and choose thresholds in a nested order.  Lean forces the
+order to be correct.  Maintain a parameter ledger such as
+\[
+ A\longmapsto \delta_A\longmapsto x_0(A,\delta_A),
+\]
+and never reuse one existential threshold for a stronger statement without a
+maximum argument.
+
+Prefer eventual finite inequalities over a proliferation of bespoke
+little-\(o\) definitions.  For example, the final positivity step should have
+the shape
+\[
+ \exists x_0\ \forall x\geq x_0,
+ \quad S_2(x)-S_1(x)>0,
+\]
+deduced from named main-term bounds.  Generic filter theorems can establish the
+eventual bounds, but the final arithmetic implication should be explicit.
+
+For each use of asymptotic notation, record:
+\begin{itemize}
+\item domain and filter;
+\item all fixed and varying parameters;
+\item positivity conditions for logarithms and denominators;
+\item uniformity over residues, moduli, tuple indices, and support cells; and
+\item the exact later inequality for which the estimate is sufficient.
+\end{itemize}
+
+\section{ChatGPT/Codex protocol inside VS Code}
+
+AI assistance is most reliable when each request has one mathematical target,
+one file boundary, and an executable acceptance test.  Do not ask an agent to
+``formalise Section 6'' in one pass.
+
+\subsection{Required task packet}
+
+Every Codex task should include:
+
+\begin{enumerate}
+\item exact file and theorem name;
+\item current imports and the pinned toolchain;
+\item the fully quantified mathematical statement;
+\item the relevant source paragraph or a self-contained proof;
+\item permitted helper lemmas and prohibited trust shortcuts;
+\item the command that must pass; and
+\item the expected axiom audit.
+\end{enumerate}
+
+Use the following prompt template.
+
+\begin{lstlisting}[language={}]
+You are working in the pinned Lean 4/mathlib project PrimeGaps236.
+
+Task: prove theorem <fully-qualified-name> in <path>.
+Mathematical statement: <fully quantified statement>.
+Informal proof/source: <self-contained proof or exact locator>.
+Allowed dependencies: <list>.
+
+Requirements:
+1. Inspect existing declarations with #check and source search; do not invent APIs.
+2. Do not use axiom, sorry, admit, unsafe theorem insertion, or native assertions.
+3. Preserve the intended quantifier order and endpoint conventions.
+4. Add small named helper lemmas when they expose mathematical structure.
+5. Run: lake build <Module.Name>
+6. Run the relevant #print axioms audit and report its exact output.
+7. Summarize any mismatch between the informal proof and the formal statement.
+
+Do not weaken the theorem or add hypotheses without explaining the blocker.
+\end{lstlisting}
+
+\subsection{Four useful agent modes}
+
+\begin{longtable}{p{0.18\textwidth}p{0.32\textwidth}p{0.40\textwidth}}
+\toprule
+Mode & Request & Required result \\
+\midrule
+Implementation & Prove one approved lemma & Compiling change plus local axiom
+audit \\
+API reconnaissance & Find existing mathlib support for one concept & Exact
+declaration names, imports, and a compiling scratch example; no project edit \\
+Adversarial audit & Try to falsify statement or locate hidden assumptions &
+Concrete counterexample, missing hypothesis, or checked confirmation \\
+Refactor & Shorten or generalize already proved code & Identical public theorem
+and unchanged axiom output \\
+\bottomrule
+\end{longtable}
+
+Separate implementation and adversarial-audit chats.  The auditor should be
+given the statement and source but not encouraged to preserve the implementer's
+approach.  For high-risk analytic lemmas, a human must review both the Lean
+statement and the mathematical reduction; a green build checks the term, not
+the intended interpretation.
+
+\subsection{When Codex gets stuck}
+
+After two or three failed proof shapes, stop local tactic experimentation and
+classify the obstacle:
+
+\begin{enumerate}
+\item missing library theorem;
+\item wrong or under-specified mathematical statement;
+\item coercion/normalization mismatch;
+\item inadequate data representation;
+\item performance problem in reduction; or
+\item a genuine gap in the paper proof.
+\end{enumerate}
+
+For (1), prove a reusable lemma or consult the mathlib community.  For (2) or
+(6), return to the source ledger and obtain mathematical review.  For (4) or
+(5), redesign the interface or certificate.  Repeated tactic search should not
+be used to conceal an unresolved mathematical premise.
+
+\section{Continuous verification and trust audit}
+
+\subsection{Local checks}
+
+Run at least the following before every merge:
+
+\begin{lstlisting}[language=bash]
+lake build
+rg -n '\bsorry\b|\badmit\b|^\s*axiom\b' PrimeGaps236
+git diff --check
+\end{lstlisting}
+
+Keep an audit module containing:
+
+\begin{lstlisting}
+import PrimeGaps236.Final
+
+#check PrimeGaps236.boundedPrimeGaps_236
+#print axioms PrimeGaps236.boundedPrimeGaps_236
+\end{lstlisting}
+
+The exact output belongs in the release log.  A text search is only a first
+line of defense; the transitive axiom report is authoritative for accidental
+imports of incomplete results.
+
+\subsection{Independent rechecking}
+
+Lean's validation guide recommends \leanname{lean4checker --fresh} on the
+built module and identifies comparator plus an external checker as the gold
+standard for unreviewed or potentially adversarial generated code
+\cite{LeanValidation}.  Accordingly, the release process should include:
+
+\begin{enumerate}
+\item a clean build on two independently provisioned machines;
+\item \leanname{lean4checker --fresh} for the final module;
+\item a sandboxed comparator/external-checker run if supported by the pinned
+Lean version;
+\item a manual raw inspection of the final theorem statement and the unfolded
+definitions it uses; and
+\item SHA-256 hashes for the source bundle and verification logs.
+\end{enumerate}
+
+Never run unreviewed generator or tactic code with valuable credentials in the
+environment.  Proof-generating metaprograms are executable programs even when
+their output is later kernel checked.
+
+\begin{gate}[Unconditional theorem]
+The gate passes only if a clean checkout builds
+\leanname{PrimeGaps236.Final}, the primary theorem has no arguments, the axiom
+output contains no nonstandard/project/computation axiom, and an independent
+review confirms that the formal statement means infinitely many consecutive
+prime gaps of size at most \(236\).
+\end{gate}
+
+\section{Paper-to-code correspondence}
+
+The mathematical paper should be readable without Lean, and the Lean code
+should be checkable without trusting prose.  Link them with a source map.
+
+For every numbered theorem or nontrivial computational claim, the paper should
+give:
+\begin{itemize}
+\item its fully qualified Lean theorem name;
+\item the source module;
+\item whether the proof is conceptual, reflective, or certificate-based; and
+\item the relevant certificate identifier and checksum, if any.
+\end{itemize}
+
+A generated appendix table may have columns:
+
+\begin{center}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.15\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}X}
+\toprule
+Paper item & Lean declaration & Module & Dependencies \\
+\midrule
+Main theorem & \leanname{boundedPrimeGaps\_236} &
+\leanname{PrimeGaps236.Final} & Analytic input construction, crossing, tuple \\
+Sieve criterion & \leanname{maynardCriterion} &
+\path{Sieve.MaynardCriterion} & Main-term and distribution lemmas \\
+Support certificate & \leanname{allSupportCases} &
+\path{Certificates.SupportData} & Sound rational checker \\
+Numerical crossing & \leanname{trialCrossing} &
+\path{TrialFunction.Crossing} & Exact rational integral certificates \\
+Tuple & \leanname{admissibleTuple236} &
+\path{Tuple.Admissible236} & Finite residue computation \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The paper's abstract must distinguish three dates: the date the mathematical
+proof was completed, the Lean release tag, and the arXiv version.  State the
+trusted computing base accurately.  Do not say ``verified by Lean'' if the
+final theorem still takes \leanname{AnalyticInput} as an argument or if native
+certificate axioms appear in its dependency closure.
+
+\section{arXiv release package}
+
+arXiv supports program code as ancillary material only when the article is
+submitted from TeX/PDFLaTeX source, not as a PDF-only submission.  Ancillary
+files belong under an \leanname{anc/} directory at the root of the upload
+package \cite{ArxivAncillary}.  Use this structure:
+
+\begin{lstlisting}[language={}]
+arxiv-upload/
+  main.tex
+  main.bbl
+  figures/
+  00README
+  anc/
+    README.txt
+    lean/
+      lean-toolchain
+      lakefile.toml
+      lake-manifest.json
+      PrimeGaps236.lean
+      PrimeGaps236/
+        ... all imported .lean source files ...
+      REPRODUCING.md
+      LICENSE
+      manifest.sha256
+\end{lstlisting}
+
+Do not put paper TeX files in \leanname{anc/}.  Do not rely on links from code
+that contain the literal \leanname{anc/} prefix, because arXiv may change the
+download layout.  Do not include \leanname{.git/}, \leanname{.lake/},
+\leanname{.vscode/}, generated \leanname{.olean} files, local caches, solver
+binaries, or secrets.  arXiv deletes hidden files on announcement, so the
+ancillary project must reproduce without them \cite{ArxivTeX}.
+
+The root \leanname{00README} should identify \leanname{main.tex} as the top
+level file if necessary.  Compile with an arXiv-supported TeX Live setup,
+include the matching \leanname{main.bbl}, omit auxiliary build products, and
+inspect the PDF that arXiv itself generates.  arXiv currently advises against
+extraneous source files and requires authors to review the processed PDF
+\cite{ArxivTeX}.
+
+The ancillary \leanname{README.txt} must contain exact commands:
+
+\begin{lstlisting}[language={}]
+1. Install elan, git, and curl.
+2. In this directory run: lake exe cache get
+3. Run: lake build
+4. Run the final axiom audit documented in AxiomAudit.lean.
+5. Run lean4checker --fresh on PrimeGaps236.Final if available.
+Expected theorem: PrimeGaps236.boundedPrimeGaps_236
+Expected statement: BoundedPrimeGaps 236
+\end{lstlisting}
+
+Also create a public version-controlled repository and archive its exact
+release tag with a durable identifier.  The arXiv ancillary copy remains the
+version-specific snapshot; the repository supports issue tracking and later
+toolchain ports.  The paper should link both and state their hashes.
+
+\section{Release checklist}
+
+No item may be waived silently.
+
+\begin{longtable}{p{0.05\textwidth}p{0.73\textwidth}p{0.12\textwidth}}
+\toprule
+ID & Check & Required \\
+\midrule
+\endfirsthead
+\toprule
+ID & Check & Required \\
+\midrule
+\endhead
+R1 & The unfolded final statement is the intended assertion about infinitely
+many consecutive prime gaps. & \mustpass \\
+R2 & The final theorem has no analytic hypothesis or certificate hypothesis. &
+\mustpass \\
+R3 & Every source citation used mathematically maps to a proved Lean theorem. &
+\mustpass \\
+R4 & The negative-\(\omega_0\) branch and the \(\omega_0=0\) endpoint are
+proved in their exact modulus normalization. & \mustpass \\
+R5 & The 105 support cases and their \(73+8+24\) split are checked by proved
+rational procedures. & \mustpass \\
+R6 & The trial-function crossing is an exact rational theorem; no external
+ball or LP output is trusted. & \mustpass \\
+R7 & The explicit 48-tuple is formally admissible and has diameter 236. &
+\mustpass \\
+R8 & \leanname{lake build} succeeds in a clean checkout from the archived
+files. & \mustpass \\
+R9 & \leanname{\#print axioms} contains only the approved standard foundational
+axioms. & \mustpass \\
+R10 & \leanname{lean4checker --fresh} and, if available, external checking
+succeed. & \mustpass \\
+R11 & Two mathematical reviewers audit the analytic statements and one
+independent Lean reviewer audits the trust boundary. & \mustpass \\
+R12 & Paper theorem numbers, Lean names, release tag, and hashes agree. &
+\mustpass \\
+R13 & The arXiv source compiles on the current arXiv TeX system and the generated
+PDF is visually inspected. & \mustpass \\
+R14 & Ancillary code contains all sources and manifests, but no hidden caches,
+binaries, credentials, or paper TeX files. & \mustpass \\
+R15 & The title and abstract accurately say ``unconditional Lean
+formalisation'' only after R1--R14 pass. & \mustpass \\
+\bottomrule
+\end{longtable}
+
+\section{Gap register and decision rules}
+
+Maintain a public \leanname{GAPS.md}.  At minimum begin with:
+
+\begin{longtable}{p{0.06\textwidth}p{0.275\textwidth}p{0.375\textwidth}p{0.16\textwidth}}
+\toprule
+ID & Risk & Required resolution & Priority \\
+\midrule
+\endfirsthead
+\toprule
+ID & Risk & Required resolution & Priority \\
+\midrule
+\endhead
+G1 & Stadlmann analytic framework is not presently a proved Lean dependency &
+Formalise every proposition and cited input in the corrected normalization &
+Critical \\
+G2 & Printed negative-\(\omega_0\) Type-IIc capacity is impossible & Prove
+the separate Bombieri--Vinogradov branch and the endpoint split & Critical \\
+G3 & Deep Type-III inputs may require absent foundational theory & Complete an
+early vertical feasibility proof and expand the source ledger & Critical \\
+G4 & Existing support LP logs do not themselves constitute Lean proofs & Export
+full rational witnesses and verify with a proved checker & High \\
+G5 & Existing \(J\)-bounds trust rational geometry plus Arb & Replace by exact
+rational or proved interval certificates & High \\
+G6 & Passage from \(\varepsilon=0\) to positive \(\varepsilon\) is non-effective
+& Prefer a directly certified rational \(\varepsilon_* >0\), or formalise the
+limit argument & High \\
+G7 & Informal \(o(1)\) terms conceal quantifier order & State uniform eventual
+bounds and prove the final positivity threshold & High \\
+G8 & AI-generated statements may be subtly weaker than the paper & Independent
+statement review, raw unfolding, and paper-to-code map & Critical \\
+\bottomrule
+\end{longtable}
+
+Use these decision rules:
+
+\begin{enumerate}
+\item A discovered mathematical gap pauses downstream theorem claims but does
+not justify an axiom.
+\item A slow certificate triggers representation work before more hardware.
+\item An API mismatch triggers a small adapter lemma, not a rewrite of the
+mathematical statement.
+\item A source estimate with unavailable prerequisites triggers a documented
+go/no-go review after the early feasibility spike.
+\item The numerical target may be weakened only by an explicit project
+decision and a new statement review; Codex must not weaken it to make a proof
+compile.
+\end{enumerate}
+
+\section{Recommended immediate next sprint}
+
+The first sprint should produce evidence about feasibility rather than a large
+volume of code.
+
+\begin{enumerate}[label=S\arabic*.,leftmargin=3.2em]
+\item Create the pinned repository and implement the direct
+\leanname{BoundedPrimeGaps} statement plus its nth-prime bridge.
+\item Translate the explicit tuple and prove its admissibility without native
+trust axioms.
+\item Write \leanname{AnalyticInput} with no omitted quantifiers, then compile a
+conditional final spine whose finite requirements are still named structure
+fields.
+\item Complete the source ledger for the negative-\(\omega_0\) branch and one
+hard Type-III estimate, recursively listing every cited theorem.
+\item Implement a tiny prototype rational LP checker and verify one of the 24
+saved dual cases end to end.
+\item Search for and certify a concrete positive \(\varepsilon_*\), because
+this can remove the limiting-support bridge.
+\item At sprint end, publish a dependency report: proved, reusable from
+mathlib, needs formalisation, or mathematically unresolved.
+\end{enumerate}
+
+This sprint should end with a realistic estimate of the analytic mountain.  It
+should not end with a public claim that Lean has proved \(\Hone\leq236\).
+
+\section{Effort model}
+
+Calendar predictions are unreliable before the source audit, but the relative
+scale is clear.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{p{0.31\textwidth}p{0.18\textwidth}X}
+\toprule
+Work package & Relative size & Main uncertainty \\
+\midrule
+Statement, tuple, repository & Small & nth-prime bridge and definitions \\
+Support and LP certificates & Medium & certificate volume and reduction speed \\
+Trial function and integrals & Medium--large & efficient exact geometry checker \\
+Abstract Maynard sieve & Large & asymptotic main-term infrastructure \\
+Bombieri--Vinogradov & Large & large-sieve and character-sum prerequisites \\
+Harman minorant & Large & combinatorial identities and uniform mass bounds \\
+Type-I/II/III distribution & Very large & deep exponential-sum dependencies \\
+Audit, paper, and release & Medium & independent review and reproducibility \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+A small expert team should expect months for the finite and abstract-sieve
+layers and potentially years for the complete analytic chain.  This is not a
+reason to avoid the project; it is a reason to perform the hardest dependency
+spike early and to describe intermediate releases accurately.
+
+\section{Definition of done}
+
+The project is complete exactly when the archived sources can be placed in a
+fresh environment and the following chain succeeds:
+\[
+\begin{gathered}
+\text{pinned toolchain}\ \longrightarrow\ \text{clean build}
+\longrightarrow\ \text{final no-argument theorem},\\
+\text{approved axiom report}\ \longrightarrow\ \text{independent replay},\\[2pt]
+\texttt{PrimeGaps236.boundedPrimeGaps\_236}:
+\texttt{BoundedPrimeGaps 236}.
+\end{gathered}
+\]
+The paper must then explain that theorem, the corrected analytic proof, and the
+certificate checkers in enough mathematical detail for independent experts to
+understand what Lean checked.  The arXiv ancillary source must reproduce the
+same theorem at the same release tag.  Anything short of this is a valuable
+intermediate formalisation, but not the requested end-to-end unconditional
+formalisation.
+
+\begin{thebibliography}{99}
+
+\bibitem{Maynard2015}
+J. Maynard,
+\emph{Small gaps between primes},
+Annals of Mathematics \textbf{181} (2015), 383--413.
+\url{https://doi.org/10.4007/annals.2015.181.1.7}.
+
+\bibitem{Stadlmann2026}
+J. Stadlmann,
+\emph{On the smallest gaps between primes},
+arXiv:2608.31126 (manuscript version to be fixed in the project source ledger).
+\url{https://arxiv.org/abs/2608.31126}.
+
+\bibitem{LeanInstall}
+Lean project,
+\emph{Install Lean and create a mathlib project},
+accessed 3 September 2026.
+\url{https://lean-lang.org/install/manual/}.
+
+\bibitem{LeanValidation}
+Lean project,
+\emph{Validating a Lean Proof},
+Lean Language Reference, accessed 3 September 2026.
+\url{https://lean-lang.org/doc/reference/latest/ValidatingProofs/}.
+
+\bibitem{MathlibReadme}
+Lean community,
+\emph{mathlib4: installation, documentation, and build commands},
+accessed 3 September 2026.
+\url{https://github.com/leanprover-community/mathlib4/blob/master/README.md}.
+
+\bibitem{MathlibPrimeCounting}
+Lean community,
+\emph{Mathlib.NumberTheory.PrimeCounting},
+mathlib documentation, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/PrimeCounting.html}.
+
+\bibitem{MathlibSelberg}
+Lean community,
+\emph{Mathlib.NumberTheory.SelbergSieve},
+mathlib documentation, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/SelbergSieve.html}.
+
+\bibitem{MathlibDirichlet}
+Lean community,
+\emph{Mathlib.NumberTheory.DirichletCharacter.Basic},
+mathlib documentation, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/DirichletCharacter/Basic.html}.
+
+\bibitem{MathlibMoebius}
+Lean community,
+\emph{Mathlib.NumberTheory.ArithmeticFunction.Moebius},
+mathlib documentation, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/ArithmeticFunction/Moebius.html}.
+
+\bibitem{MathlibAsymptotics}
+Lean community,
+\emph{Mathlib.Analysis.Asymptotics.Basic},
+mathlib documentation, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathlib4_docs/Mathlib/Analysis/Asymptotics/Basic.html}.
+
+\bibitem{MathInLean}
+J. Avigad, P. Massot, F. van Doorn, and others,
+\emph{Mathematics in Lean}, accessed 3 September 2026.
+\url{https://leanprover-community.github.io/mathematics_in_lean/}.
+
+\bibitem{ArxivAncillary}
+arXiv,
+\emph{Ancillary Files (data, code, images)},
+accessed 3 September 2026.
+\url{https://info.arxiv.org/help/ancillary_files.html}.
+
+\bibitem{ArxivTeX}
+arXiv,
+\emph{Submit TeX/LaTeX},
+accessed 3 September 2026.
+\url{https://info.arxiv.org/help/submit_tex.html}.
+
+\end{thebibliography}
+
+\end{document}

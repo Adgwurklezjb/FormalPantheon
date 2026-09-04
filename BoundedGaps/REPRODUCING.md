@@ -1,3 +1,46 @@
+# Reproducing BoundedGaps
+
+The authoritative classification of the native, Stadlmann-audit, and
+PrimeGaps186 routes is
+[`Documentation/H1236/PROJECT_STATUS.md`](Documentation/H1236/PROJECT_STATUS.md).
+There are two independent executable workflows.
+
+## Main Lean 4.32 project
+
+From the repository root, optionally retrieve the pinned Mathlib cache on a
+fresh checkout, then run the complete build and all public audits:
+
+```sh
+lake exe cache get
+lake build
+lake env lean H1236StatementAudit.lean
+lake env lean H1236TupleAudit.lean
+lake env lean AxiomAudit.lean
+```
+
+This workflow verifies the native unconditional `H₁ ≤ 600` theorem and the
+statement, tuple, and elementary bridge layers for 236. It does not prove the
+incomplete Stadlmann analytic antecedent.
+
+## Pinned PrimeGaps186 bridge
+
+From the same root, run:
+
+```sh
+Verification/PrimeGaps186Bridge/verify.sh
+```
+
+The nested project owns its Lean 4.34.0-rc2 toolchain and exact manifest. The
+command fetches the pinned `PrimeGaps186` commit, builds its conditional
+`H₁ ≤ 186` theorem, compiles the semantic bridge to FormalPantheon's public
+`H₁ ≤ 236` statement, and prints the bridge axiom sets. The trust boundary is
+exactly `PrimeGap186.kloosterman3_bound`,
+`PrimeGap186.kloosterman2_correlation_bound`, and
+`PrimeGap186.physical_integral_bounds`, in addition to `propext`,
+`Classical.choice`, and `Quot.sound`.
+
+The rest of this document preserves the detailed Milestone 1 baseline record.
+
 # Reproducing the unchanged `H₁ ≤ 600` baseline
 
 This audit was run from
@@ -345,3 +388,23 @@ the checked theorem path uses `sorry`, `admit`, a project-specific axiom,
 `native_decide`, an unsafe proof mechanism, or an explicit `opaque` proof
 wrapper. The seven repository `sorry` occurrences are isolated in standalone
 challenge/comparator modules and are not dependencies of the audited theorem.
+
+## Separate conditional H₁ ≤ 236 bridge
+
+The baseline above remains unchanged. A permanent isolated subproject now
+checks a separate conditional route from the pinned `PrimeGaps186` theorem to
+`BoundedGaps.H1236.boundedGapsStatement236`:
+
+```sh
+Verification/PrimeGaps186Bridge/verify.sh
+```
+
+The subproject owns its Lean 4.34.0-rc2 toolchain and exact dependency
+manifest. It imports the actual current public statement modules but is not
+part of the Lean 4.32 production dependency graph. Its terminal theorem
+depends on `PrimeGap186.kloosterman3_bound`,
+`PrimeGap186.kloosterman2_correlation_bound`, and
+`PrimeGap186.physical_integral_bounds`, in addition to the three foundational
+axioms. See
+`Documentation/H1236/Small_prime_gaps/PRIMEGAPS186_DURABLE_BRIDGE.md` for the
+complete build, compatibility, and axiom audit.
