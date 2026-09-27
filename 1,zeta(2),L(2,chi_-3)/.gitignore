@@ -1,0 +1,17 @@
+.lake/
+.tooling/
+build/
+dist/
+*.olean
+*.ilean
+*.c
+*.tar
+*.tmp
+*.log
+.DS_Store
+
+# Local editor and environment files
+.vscode/
+.idea/
+*.swp
+*.swo
