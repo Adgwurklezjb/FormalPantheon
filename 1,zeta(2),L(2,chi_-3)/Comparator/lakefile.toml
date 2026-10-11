@@ -1,0 +1,6 @@
+name = "comparator_tools"
+
+[[require]]
+name = "Comparator"
+git = "https://github.com/leanprover/comparator.git"
+rev = "97ef939c9fe3f8abf93e4adb654517476da7a66f"

@@ -1,0 +1,12 @@
+{
+  "challenge_module": "Comparator.Challenge",
+  "solution_module": "Comparator.Solution",
+  "theorem_names": [
+    "DirichletL.Comparison.mainTheorem",
+    "DirichletL.Comparison.linearIndependent",
+    "DirichletL.Comparison.piSquaredTheorem",
+    "DirichletL.Comparison.irrational"
+  ],
+  "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"],
+  "enable_nanoda": false
+}
